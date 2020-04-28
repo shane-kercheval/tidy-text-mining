@@ -94,6 +94,62 @@ Notice that we chose the name `word` for the output column from `unnest_tokens()
 
 Now that the text is in a tidy format with one word per row, we are ready to do the sentiment analysis. First, let's use the NRC lexicon and `filter()` for the joy words. Next, let's `filter()` the data frame with the text from the books for the words from *Emma* and then use `inner_join()` to perform the sentiment analysis. What are the most common joy words in *Emma*? Let's use `count()` from dplyr.
 
+```{r}
+
+sentiment_names <- c('positive', 
+                     'joy', 
+                     'trust', 
+                     'surprise', 
+                     'anticipation',
+                     'disgust', 
+                     'sadness', 
+                     'fear', 
+                     'anger', 
+                     'negative')
+sentiment_colors <- rt_colors(color_names = c("custom_green",
+                                              "custom_purple",
+                                              "pastel_blue",
+                                              "tuplip_tree",
+                                              "dove_gray",
+                                              "sunflower",
+                                              "mariner",
+                                              "cadmium_orange",
+                                              "crail",
+                                              "tomato"))
+#rt_plot_colors()
+
+
+temp_sentiments <- tidy_books %>%
+  #filter(book == "Emma") %>%
+  inner_join(get_sentiments("nrc") %>%
+               mutate(sentiment = factor(sentiment, levels=sentiment_names)),
+             by = 'word') %>%
+  count(word, sentiment, book, sort = TRUE)
+
+
+temp_sentiments %>%
+  count(sentiment, sort = TRUE)
+
+
+library(forcats)
+library(rtools)
+base_size <- 12
+num_breaks <- 10
+temp_sentiments %>%
+  count(sentiment, book, sort = TRUE) %>% 
+  #mutate(sentiment = fct_reorder(sentiment, n, sum, .desc = TRUE)) %>%
+  ggplot(aes(x=sentiment, y=n, fill=sentiment)) +
+  geom_col(alpha=0.75) +
+  scale_y_continuous(breaks = pretty_breaks(num_breaks), labels = rt_pretty_axes) +
+  scale_fill_manual(values=sentiment_colors) +
+  theme_light(base_size = base_size) +
+  theme(axis.text.x=element_text(angle=30, hjust=1),
+        legend.position = 'none') +
+  facet_wrap( ~ book, scales='free_y')
+  
+```
+
+
 ```{r eval=FALSE}
 nrc_joy <- get_sentiments("nrc") %>% 
   filter(sentiment == "joy")
