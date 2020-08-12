@@ -96,6 +96,9 @@ Now that the text is in a tidy format with one word per row, we are ready to do 
 
 ```{r}
 
+#not sure i can do this because get_sentiments("nrc") returns multiple sentiment values per word, so inner_join duplicates words
+
+
 sentiment_names <- c('positive', 
                      'joy', 
                      'trust', 
@@ -126,11 +129,6 @@ temp_sentiments <- tidy_books %>%
              by = 'word') %>%
   count(word, sentiment, book, sort = TRUE)
 
-
-temp_sentiments %>%
-  count(sentiment, sort = TRUE)
-
-
 library(forcats)
 library(rtools)
 base_size <- 12
@@ -146,9 +144,98 @@ temp_sentiments %>%
   theme(axis.text.x=element_text(angle=30, hjust=1),
         legend.position = 'none') +
   facet_wrap( ~ book, scales='free_y')
-  
 ```
 
+```{r}
+sentiment_names <- c('positive', 
+                     'negative')
+sentiment_colors <- rt_colors(color_names = c("custom_green",
+                                              "tomato"))
+#rt_plot_colors()
+
+temp_sentiments <- tidy_books %>%
+  #filter(book == "Emma") %>%
+  inner_join(get_sentiments("bing") %>%
+               mutate(sentiment = factor(sentiment, levels=sentiment_names)),
+             by = 'word') %>%
+  count(sentiment, book, sort = TRUE)
+
+library(forcats)
+library(rtools)
+base_size <- 12
+num_breaks <- 10
+temp_sentiments %>%
+  ggplot(aes(x=sentiment, y=n, fill=sentiment)) +
+  geom_col(alpha=0.75) +
+  scale_y_continuous(breaks = pretty_breaks(num_breaks), labels = rt_pretty_axes) +
+  scale_fill_manual(values=sentiment_colors) +
+  theme_light(base_size = base_size) +
+  theme(axis.text.x=element_text(angle=30, hjust=1),
+        legend.position = 'none') +
+  facet_wrap( ~ book, scales='free_y')
+```
+
+
+```{r}
+sentiment_names <- c('positive', 
+                     'negative')
+sentiment_colors <- rt_colors(color_names = c("custom_green",
+                                              "tomato"))
+#rt_plot_colors()
+
+temp_sentiments <- tidy_books %>%
+  #filter(book == "Emma") %>%
+  inner_join(get_sentiments("afinn") %>%
+               rename(sentiment = value),
+             by = 'word') %>%
+  group_by(word, book) %>%
+  summarise(num_occurances=n(),
+            total_sentiment=sum(sentiment)) %>%
+  ungroup()
+
+library(forcats)
+library(rtools)
+base_size <- 12
+num_breaks <- 10
+temp_sentiments %>%
+  group_by(book) %>%
+  summarise(num_words = n(),
+            total_sentiment=sum(total_sentiment),
+            average_sentiment_per_word = total_sentiment / num_words) %>% 
+  #mutate(sentiment = fct_reorder(sentiment, n, sum, .desc = TRUE)) %>%
+  ggplot(aes(x=book, y=average_sentiment_per_word)) +
+  geom_col(alpha=0.75) +
+  scale_y_continuous(breaks = pretty_breaks(num_breaks), labels = rt_pretty_axes) +
+  theme_light(base_size = base_size) +
+  theme(axis.text.x=element_text(angle=30, hjust=1),
+        legend.position = 'none')
+```
+
+```{r}
+sentiment_names <- c('positive', 
+                     'negative')
+sentiment_colors <- rt_colors(color_names = c("custom_green",
+                                              "tomato"))
+#rt_plot_colors()
+
+temp_sentiments <- tidy_books %>%
+  inner_join(get_sentiments("afinn") %>%
+               rename(sentiment = value),
+             by = 'word')
+
+library(forcats)
+library(rtools)
+base_size <- 12
+num_breaks <- 10
+temp_sentiments %>%
+  ggplot(aes(x=book, y=sentiment)) +
+  geom_boxplot() +
+  scale_y_continuous(breaks = pretty_breaks(num_breaks), labels = rt_pretty_axes) +
+  coord_cartesian(ylim = c(-5, 5)) +
+  theme_light(base_size = base_size) +
+  theme(axis.text.x=element_text(angle=30, hjust=1),
+        legend.position = 'none')
+```
 
 ```{r eval=FALSE}
 nrc_joy <- get_sentiments("nrc") %>% 
@@ -349,6 +436,7 @@ We've seen that this tidy text mining approach works well with ggplot2, but havi
 For example, consider the wordcloud package, which uses base R graphics. Let's look at the most common words in Jane Austen's works as a whole again, but this time as a wordcloud in Figure \@ref(fig:firstwordcloud).
 
 ```{r firstwordcloud, dependson = "tidy_books", fig.height=6, fig.width=6, fig.cap="The most common words in Jane Austen's novels"}
+install.packages('wordcloud')
 library(wordcloud)
 
 tidy_books %>%
@@ -359,16 +447,29 @@ tidy_books %>%
 
 In other functions, such as `comparison.cloud()`, you may need to turn the data frame into a matrix with reshape2's `acast()`. Let's do the sentiment analysis to tag positive and negative words using an inner join, then find the most common positive and negative words. Until the step where we need to send the data to `comparison.cloud()`, this can all be done with joins, piping, and dplyr because our data is in tidy format.
 
-```{r wordcloud, dependson = "tidy_books", fig.height=5, fig.width=5, fig.cap="Most common positive and negative words in Jane Austen's novels"}
+```{r wordcloud, dependson = "tidy_books", fig.cap="Most common positive and negative words in Jane Austen's novels"}
 library(reshape2)
 
 tidy_books %>%
   inner_join(get_sentiments("bing")) %>%
   count(word, sentiment, sort = TRUE) %>%
   acast(word ~ sentiment, value.var = "n", fill = 0) %>%
-  comparison.cloud(colors = c("gray20", "gray80"),
+  comparison.cloud(colors = rt_colors_good_bad(good_first = FALSE),
                    max.words = 100)
 ```
+
+```{r}
+library(reshape2)
+
+tidy_books %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, book, sort = TRUE) %>%
+  acast(word ~ book, value.var = "n", fill = 0) %>%
+  comparison.cloud(colors = rt_colors(),
+                   max.words = 100, )
+```
+```
+
 
 The size of a word's text in Figure \@ref(fig:wordcloud) is in proportion to its frequency within its sentiment. We can use this visualization to see the most important positive and negative words, but the sizes of the words are not comparable across sentiments.
 
